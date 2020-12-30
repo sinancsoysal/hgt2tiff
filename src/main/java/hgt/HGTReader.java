@@ -4,15 +4,16 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class HGTReader {
     public enum SRTMFormat{ SRTM3, SRTM1, Unknown }
+    private String path;
     private SRTMFormat _format;
     private int _tileSize;
     private short[][] _heightData;
-    public HGTReader(String path){
-        readHeightDataFromHGTFile(path);
-    }
+    public HGTReader(String path){ this.path = path; }
     private void readHeightDataFromHGTFile(String path){
         generateHeightMap( readBytesFromFile(path) );
     }
@@ -44,15 +45,26 @@ public class HGTReader {
         int currPos = 0;
         for(int y = 0; y < this._tileSize; y++){
             for(int x = 0; x < this._tileSize; x++){
-                short height = (short)((bytes[currPos] << 8) | (bytes[currPos + 1] & 0xff));
+                ByteBuffer byteBuffer = ByteBuffer.allocate(2);
+                byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
-                if(java.nio.ByteOrder.nativeOrder().toString().equalsIgnoreCase("little_endian")){
-                    height = (short)((bytes[currPos + 1] << 8) | (bytes[currPos] & 0xff));
+                short height;
+
+                if(java.nio.ByteOrder.nativeOrder().toString().equals("LITTLE_ENDIAN")){
+                    byteBuffer.put(bytes[currPos + 1]);
+                    byteBuffer.put(bytes[currPos]);
+                    height = byteBuffer.getShort();
+                } else{
+                    byteBuffer.put(bytes[currPos]);
+                    byteBuffer.put(bytes[currPos + 1]);
+                    height = byteBuffer.getShort();
                 }
+                byteBuffer.clear();
 
                 // Voids are flagged with the value -32768
                 if(height == -32768){ height = 0; }
-                this._heightData[y][x] = height;
+
+                _heightData[y][x] = height;
                 currPos += 2;
             }
         }
